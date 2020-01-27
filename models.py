@@ -42,10 +42,8 @@ def get_c_loss(model,
         positive_log_density = c_model.log_density(o, o_next, context)
 
         # Negative
-        negative_c = context.repeat(N, 1, 1, 1)
-        if o_neg is None:
-            negative_o_pred = model.inference(negative_c, n_samples=1, layer_cond=False)
-        else:
+        negative_c = None
+        with torch.no_grad():
             negative_o_pred = model(o_neg, negative_c)[0]
         negative_log_density = c_model.log_density(o.repeat(N, 1, 1, 1), negative_o_pred, negative_c).view(N,
                                                                                                            batch_size).t()
@@ -61,9 +59,7 @@ def get_c_loss(model,
         # Positive
         positive_y_pred = c_model(o, o_next, context)
         # Negative
-        if o_neg is None:
-            negative_o_pred = model.inference(context, n_samples=1, layer_cond=False)
-        else:
+        with torch.no_grad():
             negative_o_pred = model(o_neg, context)[0]
         negative_y_pred = c_model(o, negative_o_pred, context)
         ys = torch.cat([positive_y_pred, negative_y_pred])
@@ -526,7 +522,7 @@ class VAE(nn.Module):
             recon_x = self.decoder(means, o_cond)
         else:
             recon_x = self.decoder(z, o_cond)
-        return recon_x, means, log_var, kwargs
+        return x, means, log_var, kwargs
 
     def inference(self, o_cond=None, n_samples=1, layer_cond=True):
         """

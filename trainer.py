@@ -7,7 +7,7 @@ from utils import reset_grad, from_numpy_to_var
 from logs import log_info, log_images
 from dataset import get_torch_images_from_numpy, get_idx_t, get_torch_actions, get_negative_examples
 from tensorboard_logger import configure
-
+import tqdm
 
 def train(all_models, training_models, solver, training_params, log_every, **kwargs):
     model, c_model, actor = all_models
@@ -28,27 +28,31 @@ def train(all_models, training_models, solver, training_params, log_every, **kwa
 
     ### Load data ### -- assuming appropriate npy format
     data_file = kwargs["data_dir"]
-    data = np.load(data_file)
-    n_trajs = len(data)
-    data_size = sum([len(data[i]) - k_steps for i in range(n_trajs)])
+    data = np.load(data_file,allow_pickle=True)
+    meta = data.item().get('meta')
+    path_len = meta.item().get('path_len')
+    n_trajs = meta.item().get('num_paths')
+    data = data.item().get('top_views')
+    coords = data.item().get('coordinates')
+    data_size = path_len * n_trajs
+    if len(data.shape) == 4:
+        data = data.reshape(n_trajs,path_len,*data.shape[1:])
     print('Number of trajectories: %d' % n_trajs)  # 315
+    print('Path length: %d' % path_len)  # 315
     print('Number of transitions: %d' % data_size)  # 378315
-
-    test_file = kwargs["test_dir"]
-    test_data = np.load(test_file)
-    test_context = get_torch_images_from_numpy(test_data, conditional, one_image=True)
 
     ### Train models ###
     c_loss = vae_loss = a_loss = torch.Tensor([0]).cuda()
     for epoch in range(num_epochs):
-        n_batch = int(data_size / batch_size)
+        n_batch = 10 #int(data_size / batch_size)
         print('********** Epoch %i ************' % epoch)
-        for it in range(n_batch):
-            idx, t = get_idx_t(batch_size, k_steps, n_trajs, data)
+        for it in tqdm.tqdm(range(n_batch)):
+            idx, t = get_idx_t(batch_size, k_steps, path_len, n_trajs, data)
             o, c = get_torch_images_from_numpy(data[idx, t], conditional)
             ks = np.random.choice(k_steps, batch_size)
             o_next, _ = get_torch_images_from_numpy(data[idx, t + ks], conditional)
-            o_neg = get_negative_examples(data, idx, batch_size, N, conditional) if kwargs["use_o_neg"] else None
+            o_neg = get_negative_examples(data, idx, batch_size, N, n_trajs,path_len,coords) 
+            
             o_pred, mu, logvar, cond_info = model(o, c)
             o_next_pred, _, _, _ = model(o_next, c)
 
@@ -92,20 +96,7 @@ def train(all_models, training_models, solver, training_params, log_every, **kwa
                 ### Save params ###
                 if not os.path.exists('%s/var' % savepath):
                     os.makedirs('%s/var' % savepath)
-                torch.save(model.state_dict(), '%s/var/vae-%d-last-5' % (savepath, epoch % 5 + 1))
-                torch.save(c_model.state_dict(), '%s/var/cpc-%d-last-5' % (savepath, epoch % 5 + 1))
-                torch.save(actor.state_dict(), '%s/var/actor-%d-last-5' % (savepath, epoch % 5 + 1))
-
-                ### Log images ###
-                with torch.no_grad():
-                    n_contexts = 7
-                    n_samples_per_c = 8
-                    o_distinct_c = get_negative_examples(data, idx[:n_contexts], n_contexts, n_samples_per_c,
-                                                         conditional)
-                    log_images(o[:n_contexts],
-                               o_pred[:n_contexts],
-                               o_distinct_c.reshape(n_samples_per_c, n_contexts, *o_distinct_c.size()[1:]),
-                               c[:n_contexts], test_context,
-                               model, c_model,
-                               n_contexts, n_samples_per_c,
-                               savepath, epoch)
+                n_models = 1
+                torch.save(model.state_dict(), '%s/var/vae-%d-last-5' % (savepath, epoch % n_models + 1 ))
+                torch.save(c_model.state_dict(), '%s/var/cpc-%d-last-5' % (savepath, epoch % n_models + 1 ))
+                torch.save(actor.state_dict(), '%s/var/actor-%d-last-5' % (savepath, epoch % n_models + 1 ))

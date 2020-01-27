@@ -1,0 +1,13 @@
+export CUDA_VISIBLE_DEVICES=7 && python main.py \
+--mode c \
+--c_type cpc \
+--z_dim 32 \
+--n_epochs 200 \
+--batch_size 32 \
+--N 50 \
+--seed 0 \
+--data_dir /home/misha/downloads/unsupervised_learning/cpc/notebooks/safety_gym_point_100paths_25len_v2.npy \
+--prefix cpc \
+--e_arch cnn-3-32-64-128-256-512 \
+--c_arch cnn-3-32-64-128-256 \
+-use_o_neg

@@ -130,16 +130,16 @@ z_dim = kwargs["z_dim"]
 conditional = kwargs["conditional"]
 freeze_enc = kwargs["freeze_enc"]
 # VAE model
-model = VAE(e_arch, d_arch, z_dim, conditional)
+model = VAE(e_arch, d_arch, z_dim, conditional,img_size=(64,64))
 # C model
 if c_type[:3] == "cpc":
     log_every = 100
     if c_type == "cpc-sptm":
         log_every = 100
-    c_model = CPC(c_type, c_arch, e_arch, z_dim, model.encoder, conditional, freeze_enc)
+    c_model = CPC(c_type, c_arch, e_arch, z_dim, model.encoder, conditional, freeze_enc, img_size=(64,64))
 elif c_type[:4] == "sptm":
     log_every = 100
-    c_model = Classifier(c_type, c_arch, e_arch, z_dim, model.encoder, conditional, freeze_enc)
+    c_model = Classifier(c_type, c_arch, e_arch, z_dim, model.encoder, conditional, freeze_enc, img_size=(64,64))
 else:
     raise NotImplementedError
 # Env & Actor
